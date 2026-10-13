@@ -101,46 +101,43 @@ table.rank td,table.rank th{padding:6px 8px;border-bottom:1px solid var(--rule);
 table.rank td.n{font-family:var(--font-data);text-align:right}
 footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted)}
 </style>
+<style>
+.paste{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:16px}
+.paste p{margin:0 0 8px}
+.raw table{width:100%;border-collapse:collapse;font-size:13px}
+.raw td{border-bottom:1px solid var(--rule);padding:4px 8px;font-family:var(--font-data);overflow-wrap:anywhere}
+.raw summary{cursor:pointer;color:var(--accent);font-size:13px}
+</style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>식품 성분 돋보기</h1>
-    <p class="sub">식품안전나라 공공데이터로 식품첨가물과 가공 단계(NOVA)를 확인해요.</p>
+    <p class="sub">식약처 식품영양성분 DB로 영양성분을 찾고, 원재료명으로 식품첨가물과 가공 단계(NOVA)를 판정해요.</p>
   </header>
 
   <nav role="tablist">
     <button role="tab" data-tab="search" aria-selected="true">제품 검색</button>
-    <button role="tab" data-tab="custom" aria-selected="false">직접 입력</button>
-    <button role="tab" data-tab="stats" aria-selected="false">식품유형 통계</button>
+    <button role="tab" data-tab="custom" aria-selected="false">원재료 분석</button>
     <button role="tab" data-tab="check" aria-selected="false">연결 확인</button>
   </nav>
 
   <section id="tab-search">
     <form id="search-form" class="row">
-      <input id="q" placeholder="제품 이름 (예: 새우깡, 비엔나, 콜라)" aria-label="제품 이름">
+      <input id="q" placeholder="식품 이름 (예: 새우깡, 비엔나, 콜라)" aria-label="식품 이름">
       <button class="btn" id="search-btn">검색</button>
     </form>
     <div class="search-layout">
-      <div id="results" class="results"><p class="msg">제품 이름을 검색하면 여기에 목록이 나와요.</p></div>
+      <div id="results" class="results"><p class="msg">식품 이름을 검색하면 여기에 목록이 나와요.</p></div>
       <div id="detail" class="detail"></div>
     </div>
   </section>
 
   <section id="tab-custom" hidden>
-    <p class="note" style="margin:0 0 8px">포장에 적힌 원재료명을 그대로 붙여넣으면 분석해요.</p>
+    <p class="note" style="margin:0 0 8px">포장에 적힌 원재료명을 그대로 붙여넣으면 첨가물과 가공 단계를 분석해요.</p>
     <textarea id="c-ing" placeholder="예: 정제수, 액상과당, 구연산, 합성향료, 안식향산나트륨"></textarea>
     <div class="row" style="margin-top:8px"><input id="c-name" placeholder="식품 이름 (선택)" aria-label="식품 이름"><button class="btn" id="c-go">분석하기</button></div>
     <div id="c-detail" class="detail" style="margin-top:20px"></div>
-  </section>
-
-  <section id="tab-stats" hidden>
-    <form id="stats-form" class="row">
-      <input id="s-type" value="과자" placeholder="식품유형 (예: 과자, 탄산음료, 소시지, 유탕면)" aria-label="식품유형">
-      <select id="s-max" aria-label="최대 제품 수"><option value="500">최대 500개</option><option value="1000" selected>최대 1,000개</option><option value="3000">최대 3,000개</option></select>
-      <button class="btn" id="stats-btn">통계 계산</button>
-    </form>
-    <div id="stats"></div>
   </section>
 
   <section id="tab-check" hidden>
@@ -150,8 +147,8 @@ footer{margin-top:36px;padding-top:14px;border-top:1px solid var(--rule);font-si
   </section>
 
   <footer>
-    가공 단계 판정은 원재료 표시를 바탕으로 한 추정이며, 첨가물의 양은 판단하지 않아요. 원재료·영양성분 출처: 식품의약품안전처 식품안전나라 공공데이터.
-    영양성분 비율은 1일 영양성분 기준치(열량 2,000kcal, 나트륨 2,000mg, 당류 100g 등) 대비예요. 실험 기록은 이 브라우저에만 저장돼요.
+    영양성분 출처: 공공데이터포털 식품의약품안전처_식품영양성분DB정보. 비율은 1일 영양성분 기준치(열량 2,000kcal, 나트륨 2,000mg, 당류 100g 등) 대비예요.
+    가공 단계 판정은 원재료명을 바탕으로 한 추정이며, 첨가물의 양은 판단하지 않아요. 실험 기록은 이 브라우저에만 저장돼요.
   </footer>
 </div>
 
@@ -208,126 +205,105 @@ function analyze(raw){
   return {g,reasons:r,adds,markers:mk};
 }
 
+
 /* ================= 서버 함수 호출 (키는 서버에만 있음) ================= */
 async function food(params){
-  const qs=new URLSearchParams(params).toString();
-  const r=await fetch('/api/food?'+qs);
+  const r=await fetch('/api/food?'+new URLSearchParams(params));
   const text=await r.text();let d;
   try{d=JSON.parse(text);}catch{throw new Error(`우리 사이트의 서버 함수(/api/food)가 응답하지 않아요 (상태 ${r.status}). api 폴더가 저장소 맨 위에 있는지 확인해 주세요.`);}
-  if(!r.ok) throw new Error((d.error||'요청에 실패했어요.')+(d.preview?`\n\n[식품안전나라 응답 앞부분] ${d.preview}`:''));
+  if(!r.ok) throw new Error((d.error||'요청에 실패했어요.')+(d.preview?`\n\n[응답 앞부분] ${d.preview}`:''));
   return d;
 }
 
-/* ================= 공통 화면 조각 ================= */
+/* ================= 공통 ================= */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const NUTR=[['NUTR_CONT1','열량','kcal',2000],['NUTR_CONT6','나트륨','mg',2000],['NUTR_CONT2','탄수화물','g',324],['NUTR_CONT5','당류','g',100],['NUTR_CONT4','지방','g',54],['NUTR_CONT8','포화지방','g',15],['NUTR_CONT3','단백질','g',55]];
+const pick=(o,...ks)=>{for(const k of ks){if(o[k]!=null&&String(o[k]).trim()!=='')return o[k];}return '';};
+// 식품영양성분DB 항목 번호 → 영양소 (식품영양성분 DB의 항목 순서 기준)
+const NUTR=[['AMT_NUM1','열량','kcal',2000],['AMT_NUM13','나트륨','mg',2000],['AMT_NUM6','탄수화물','g',324],['AMT_NUM7','당류','g',100],['AMT_NUM4','지방','g',54],['AMT_NUM23','포화지방','g',15],['AMT_NUM3','단백질','g',55]];
 
+function nutritionHTML(row){
+  const std=pick(row,'NUTR_CONT_STD_QTY','SERVING_SIZE')||'?';
+  const lines=NUTR.map(([k,l,u,dv])=>{const v=parseFloat(row[k]);if(isNaN(v))return'';const p=Math.round(v/dv*100);const hi=['AMT_NUM13','AMT_NUM7','AMT_NUM23'].includes(k)&&p>=30;
+    return `<div class="nrow"><span class="nm">${l}<em>${v.toLocaleString('ko-KR')}${u}</em></span><span class="pct">${p}%</span><div class="bar"><i class="${hi?'hi':''}" style="width:${Math.min(p,100)}%"></i></div></div>`;}).join('');
+  const raw=Object.entries(row).filter(([k,v])=>v!==''&&v!=null).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+  return `<div class="factlabel"><div class="head"><b>영양정보</b><span>${esc(std)} 기준</span></div>${lines||'<p class="note">표시할 영양성분 값이 없어요.</p>'}
+    <p class="foot">빨간 막대: 나트륨·당류·포화지방이 기준치의 30% 이상</p></div>
+    <details class="raw" style="margin-top:8px"><summary>원자료 전체 보기 (값 확인용)</summary><table>${raw}</table></details>`;
+}
 function verdictHTML(name,raw,a,meta){
   return `<div class="verdict"><div class="nova" style="background:var(${NOVA[a.g][2]})"><span>NOVA</span><b>${a.g}</b><span>단계</span></div>
   <div style="min-width:0"><h2>${esc(name)}</h2><p class="meta">${esc(NOVA[a.g][0])}${meta?' · '+esc(meta):''}</p>
   <ul class="reason">${a.reasons.map(r=>`<li>${r}</li>`).join('')}</ul><p class="ing"><b>원재료</b> ${esc(raw)}</p></div></div>`;
 }
 function additivesHTML(a){
-  if(!a.adds.length) return '<p class="msg">원재료 표시에서 첨가물을 찾지 못했어요.</p>';
+  if(!a.adds.length) return '<p class="msg">원재료명에서 첨가물을 찾지 못했어요.</p>';
   return `<div class="addlist">${[...a.adds].sort((x,y)=>y.e.mk-x.e.mk).map(f=>`<div class="add ${f.e.mk?'mk':''}"><div class="top"><b>${esc(f.name)}</b><span class="chip">${f.e.cls}</span>${f.e.mk?'<span class="chip mk">초가공 지표</span>':''}</div>
     <details><summary>왜 넣었을까?</summary><p>${f.e.why}</p>${f.e.lab?`<p class="note">실험: ${f.e.lab}</p>`:''}</details></div>`).join('')}</div>`;
 }
-function nutritionHTML(row){
-  if(!row) return '<p class="msg">식품영양성분 DB에서 같은 이름의 제품을 찾지 못했어요.</p>';
-  const rows=NUTR.map(([k,l,u,dv])=>{const v=parseFloat(row[k]);if(isNaN(v))return'';const p=Math.round(v/dv*100);const hi=['NUTR_CONT6','NUTR_CONT5','NUTR_CONT8'].includes(k)&&p>=30;
-    return `<div class="nrow"><span class="nm">${l}<em>${v.toLocaleString('ko-KR')}${u}</em></span><span class="pct">${p}%</span><div class="bar"><i class="${hi?'hi':''}" style="width:${Math.min(p,100)}%"></i></div></div>`;}).join('');
-  return `<div class="factlabel"><div class="head"><b>영양정보</b><span>1회 제공량 ${esc(row.SERVING_SIZE||'?')} 기준</span></div>${rows}<p class="foot">${esc(row.DESC_KOR)} · 빨간 막대: 나트륨·당류·포화지방이 기준치의 30% 이상</p></div>`;
-}
-
-/* 실험 기록 (이 브라우저에만 저장) */
 function loadLab(id){try{return JSON.parse(localStorage.getItem('lab:'+id))||{};}catch{return {};}}
 function saveLab(id,d){try{localStorage.setItem('lab:'+id,JSON.stringify(d));}catch{}}
+const labText=v=>v==='yes'?'<span class="ok">표시와 일치</span>':v==='no'?'<span class="q">검출할 수 있는 양보다 적게 들어있을 가능성</span>':'<span class="note">아직 실험하지 않음</span>';
 function labHTML(id,a){
-  if(!a.adds.length) return '';
-  const d=loadLab(id);
+  if(!a.adds.length) return '';const d=loadLab(id);
   return `<section><h3 class="sec">실험 기록<small>동아리 검출 실험 결과를 표시와 비교해요</small></h3><div class="lab"><table><thead><tr><th>표시된 성분</th><th>실험 결과</th><th>해석</th></tr></thead><tbody>
-  ${a.adds.map(f=>{const v=d[f.name]||'';const it=v==='yes'?'<span class="ok">표시와 일치</span>':v==='no'?'<span class="q">검출할 수 있는 양보다 적게 들어있을 가능성</span>':'<span class="note">아직 실험하지 않음</span>';
-    return `<tr><td>${esc(f.name)}</td><td><select data-lab="${esc(f.name)}" data-id="${esc(id)}" aria-label="${esc(f.name)} 실험 결과"><option value="" ${!v?'selected':''}>미실시</option><option value="yes" ${v==='yes'?'selected':''}>검출됨</option><option value="no" ${v==='no'?'selected':''}>검출 안 됨</option></select></td><td>${it}</td></tr>`;}).join('')}
+  ${a.adds.map(f=>{const v=d[f.name]||'';return `<tr><td>${esc(f.name)}</td><td><select data-lab="${esc(f.name)}" data-id="${esc(id)}" aria-label="${esc(f.name)} 실험 결과"><option value="" ${!v?'selected':''}>미실시</option><option value="yes" ${v==='yes'?'selected':''}>검출됨</option><option value="no" ${v==='no'?'selected':''}>검출 안 됨</option></select></td><td>${labText(v)}</td></tr>`;}).join('')}
   </tbody></table></div></section>`;
 }
+function analysisHTML(name,raw,id,meta){
+  const a=analyze(raw);
+  return verdictHTML(name,raw,a,meta)+`<section><h3 class="sec">첨가물<small>${a.adds.length}개 · 초가공 지표 ${a.markers.length}개</small></h3>${additivesHTML(a)}</section>`+labHTML(id,a);
+}
+document.addEventListener('change',e=>{const s=e.target.closest('select[data-lab]');if(!s)return;const d=loadLab(s.dataset.id);d[s.dataset.lab]=s.value;saveLab(s.dataset.id,d);s.closest('tr').lastElementChild.innerHTML=labText(s.value);});
 
 /* ================= 제품 검색 ================= */
 let rows=[],current=null;
+const nameOf=r=>pick(r,'FOOD_NM_KR','DESC_KOR','FOOD_NM');
 $('#search-form').addEventListener('submit',async e=>{
   e.preventDefault();const q=$('#q').value.trim();if(!q)return;
-  $('#search-btn').disabled=true;$('#results').innerHTML='<p class="msg">식품안전나라에서 찾는 중…</p>';$('#detail').innerHTML='';
+  $('#search-btn').disabled=true;$('#results').innerHTML='<p class="msg">식품영양성분 DB에서 찾는 중…</p>';$('#detail').innerHTML='';
   try{
-    const d=await food({svc:'C002',PRDLST_NM:q,start:1,end:100});rows=d.rows;
-    if(!rows.length){$('#results').innerHTML='<p class="msg">검색 결과가 없어요. 제품 이름을 더 짧게 입력해 보세요.</p>';return;}
-    $('#results').innerHTML=`<p class="note" style="margin:0 0 6px">${d.total.toLocaleString('ko-KR')}개 중 ${rows.length}개</p>`+rows.map((r,i)=>{const g=analyze(r.RAWMTRL_NM).g;
-      return `<button data-i="${i}"><span class="dot" style="background:var(${NOVA[g][2]})">${g}</span><span>${esc(r.PRDLST_NM)}<small>${esc(r.BSSH_NM)}</small></span></button>`;}).join('');
-    showProduct(0);
+    const d=await food({name:q,rows:100});rows=d.rows;
+    if(!rows.length){$('#results').innerHTML='<p class="msg">검색 결과가 없어요. 이름을 더 짧게 입력해 보세요.</p>';return;}
+    $('#results').innerHTML=`<p class="note" style="margin:0 0 6px">${d.total.toLocaleString('ko-KR')}개 중 ${rows.length}개</p>`+rows.map((r,i)=>
+      `<button data-i="${i}"><span>${esc(nameOf(r))}<small>${esc([pick(r,'MAKER_NM','MFR_NM'),pick(r,'FOOD_CAT1_NM','DB_CLASS_NM')].filter(Boolean).join(' · '))}</small></span></button>`).join('');
+    showItem(0);
   }catch(err){$('#results').innerHTML=`<p class="msg err">${esc(err.message)}</p>`;}
   finally{$('#search-btn').disabled=false;}
 });
-$('#results').addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(b)showProduct(+b.dataset.i);});
+$('#results').addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(b)showItem(+b.dataset.i);});
 
-async function showProduct(i){
-  current=rows[i];document.querySelectorAll('#results button').forEach(b=>b.setAttribute('aria-current',b.dataset.i==i));
-  const r=current,a=analyze(r.RAWMTRL_NM),id=r.PRDLST_REPORT_NO||r.PRDLST_NM;
-  $('#detail').innerHTML=verdictHTML(r.PRDLST_NM,r.RAWMTRL_NM,a,[r.BSSH_NM,r.PRDLST_DCNM].filter(Boolean).join(' · '))+
-    `<div class="two"><section><h3 class="sec">영양성분</h3><div id="nutr"><p class="msg">영양성분을 찾는 중…</p></div></section>
-     <section><h3 class="sec">첨가물<small>${a.adds.length}개 · 초가공 지표 ${a.markers.length}개</small></h3>${additivesHTML(a)}</section></div>`+
-    labHTML(id,a)+
-    (r.PRDLST_DCNM?`<section><h3 class="sec">대체 식품<small>같은 식품유형(${esc(r.PRDLST_DCNM)}) 중 가공 단계가 낮은 제품</small></h3><button class="btn ghost" id="alt-btn">찾아보기</button><div id="alts"></div></section>`:'');
-  try{const d=await food({svc:'I2790',DESC_KOR:r.PRDLST_NM,start:1,end:5});if(current===r)$('#nutr').innerHTML=nutritionHTML(d.rows[0]);}
-  catch{if(current===r)$('#nutr').innerHTML=nutritionHTML(null);}
+function showItem(i){
+  current=rows[i];const r=current,name=nameOf(r),id=pick(r,'FOOD_CD','NUM')||name;
+  document.querySelectorAll('#results button').forEach(b=>b.setAttribute('aria-current',b.dataset.i==i));
+  const meta=[pick(r,'MAKER_NM','MFR_NM'),pick(r,'FOOD_CAT1_NM','DB_CLASS_NM')].filter(Boolean).join(' · ');
+  const saved=(()=>{try{return localStorage.getItem('raw:'+id)||'';}catch{return '';}})();
+  $('#detail').innerHTML=`<div class="verdict" style="grid-template-columns:1fr"><div><h2>${esc(name)}</h2><p class="meta">${esc(meta)}</p></div></div>
+    <div class="two"><section><h3 class="sec">영양성분</h3>${nutritionHTML(r)}</section>
+    <section><h3 class="sec">첨가물·가공 단계</h3><div class="paste"><p class="note">이 제품의 원재료명을 포장이나 판매 사이트에서 복사해 붙여넣으면 분석해요.</p>
+      <textarea id="p-ing" placeholder="예: 소맥분, 팜유, 정제소금, 향미증진제…">${esc(saved)}</textarea>
+      <button class="btn" id="p-go" style="margin-top:8px">분석하기</button></div></section></div>
+    <div id="p-out" class="detail"></div>`;
+  if(saved) $('#p-out').innerHTML=analysisHTML(name,saved,id,meta);
+  $('#p-go').onclick=()=>{const raw=$('#p-ing').value.trim();if(!raw){$('#p-ing').focus();return;}
+    try{localStorage.setItem('raw:'+id,raw);}catch{}
+    $('#p-out').innerHTML=analysisHTML(name,raw,id,meta);$('#p-out').scrollIntoView({behavior:'smooth',block:'start'});};
 }
-$('#detail').addEventListener('click',async e=>{
-  if(e.target.id!=='alt-btn')return;const r=current,g=analyze(r.RAWMTRL_NM).g;e.target.disabled=true;$('#alts').innerHTML='<p class="msg">찾는 중…</p>';
-  try{const d=await food({svc:'C002',PRDLST_DCNM:r.PRDLST_DCNM,start:1,end:300});const seen=new Set();
-    const c=d.rows.map(x=>({x,g:analyze(x.RAWMTRL_NM).g})).filter(o=>o.g<g&&!seen.has(o.x.PRDLST_NM)&&seen.add(o.x.PRDLST_NM)).sort((p,q)=>p.g-q.g).slice(0,6);
-    $('#alts').innerHTML=c.length?`<div class="alts">${c.map(o=>`<div class="alt"><b>${esc(o.x.PRDLST_NM)}</b><br><span class="note">${esc(o.x.BSSH_NM)}</span><br><span class="chip" style="color:#fff;background:var(${NOVA[o.g][2]})">NOVA ${o.g} · ${NOVA[o.g][1]}</span></div>`).join('')}</div>`
-      :'<p class="msg">같은 유형에서 가공 단계가 더 낮은 제품을 찾지 못했어요.</p>';}
-  catch(err){$('#alts').innerHTML=`<p class="msg err">${esc(err.message)}</p>`;}
-});
-document.addEventListener('change',e=>{const s=e.target.closest('select[data-lab]');if(!s)return;const d=loadLab(s.dataset.id);d[s.dataset.lab]=s.value;saveLab(s.dataset.id,d);
-  const td=s.closest('tr').lastElementChild;td.innerHTML=s.value==='yes'?'<span class="ok">표시와 일치</span>':s.value==='no'?'<span class="q">검출할 수 있는 양보다 적게 들어있을 가능성</span>':'<span class="note">아직 실험하지 않음</span>';});
 
-/* ================= 직접 입력 ================= */
+/* ================= 원재료 분석 ================= */
 $('#c-go').addEventListener('click',()=>{const raw=$('#c-ing').value.trim();if(!raw){$('#c-ing').focus();return;}
-  const name=$('#c-name').value.trim()||'직접 입력한 식품',a=analyze(raw);
-  $('#c-detail').innerHTML=verdictHTML(name,raw,a,'')+`<section><h3 class="sec">첨가물<small>${a.adds.length}개 · 초가공 지표 ${a.markers.length}개</small></h3>${additivesHTML(a)}</section>`+labHTML('custom:'+name,a);});
-
-/* ================= 식품유형 통계 ================= */
-$('#stats-form').addEventListener('submit',async e=>{
-  e.preventDefault();const type=$('#s-type').value.trim(),max=+$('#s-max').value;if(!type)return;
-  $('#stats-btn').disabled=true;const out=$('#stats');let all=[],total=0;
-  try{
-    for(let s=1;s<=max;s+=1000){out.innerHTML=`<p class="msg">제품을 모으는 중… ${all.length.toLocaleString('ko-KR')}개</p>`;
-      const d=await food({svc:'C002',PRDLST_DCNM:type,start:s,end:Math.min(s+999,max)});total=d.total;all=all.concat(d.rows);if(d.rows.length<1000)break;}
-    if(!all.length){out.innerHTML='<p class="msg">해당 식품유형의 제품을 찾지 못했어요. 식품유형 이름을 확인해 주세요.</p>';return;}
-    const res=all.map(r=>analyze(r.RAWMTRL_NM)),n=res.length,cnt={1:0,2:0,3:0,4:0};res.forEach(x=>cnt[x.g]++);
-    const cls={},sub={};res.forEach(x=>{new Set(x.adds.map(f=>f.e.cls)).forEach(c=>cls[c]=(cls[c]||0)+1);x.adds.forEach(f=>sub[f.name]=(sub[f.name]||0)+1);});
-    const top=(o,k)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,k);
-    const pct=v=>(v/n*100).toFixed(1)+'%';
-    out.innerHTML=`<div class="stats">
-      <div class="panel"><h3 class="sec">초가공식품 비율</h3><div class="big" style="color:var(--g4)">${pct(cnt[4])}</div><p class="note">분석한 제품 ${n.toLocaleString('ko-KR')}개 (전체 ${total.toLocaleString('ko-KR')}개) · 식품유형 "${esc(type)}"</p>
-        ${[1,2,3,4].map(g=>`<div class="hbar"><span>${g}단계 ${NOVA[g][1]}</span><div class="t"><i style="width:${cnt[g]/n*100}%;background:var(${NOVA[g][2]})"></i></div><span class="v">${pct(cnt[g])}</span></div>`).join('')}</div>
-      <div class="panel"><h3 class="sec">첨가물 용도별 사용 제품 비율</h3>${top(cls,10).map(([c,v])=>`<div class="hbar"><span>${esc(c)}</span><div class="t"><i style="width:${v/n*100}%;background:var(--accent)"></i></div><span class="v">${pct(v)}</span></div>`).join('')||'<p class="note">첨가물이 없어요.</p>'}</div>
-      <div class="panel"><h3 class="sec">가장 많이 쓰인 첨가물</h3><table class="rank"><thead><tr><th>첨가물</th><th>제품 수</th><th>비율</th></tr></thead><tbody>${top(sub,10).map(([s,v])=>`<tr><td>${esc(s)}</td><td class="n">${v.toLocaleString('ko-KR')}</td><td class="n">${pct(v)}</td></tr>`).join('')}</tbody></table>
-        <p class="note">같은 성분이라도 제품마다 표기가 달라 따로 집계될 수 있어요.</p></div></div>`;
-  }catch(err){out.innerHTML=`<p class="msg err">${esc(err.message)}</p>`;}
-  finally{$('#stats-btn').disabled=false;}
-});
+  const name=$('#c-name').value.trim()||'직접 입력한 식품';$('#c-detail').innerHTML=analysisHTML(name,raw,'custom:'+name,'');});
 
 /* ================= 연결 확인 ================= */
-$('#check-btn').addEventListener('click',async()=>{const out=$('#check');out.innerHTML='';
-  for(const [svc,label] of [['C002','품목제조보고 원재료 (C002)'],['I2790','식품영양성분 DB (I2790)']]){
-    try{const d=await food({svc,start:1,end:1});out.insertAdjacentHTML('beforeend',`<p class="msg"><span class="ok">연결됨</span> · ${label} · 전체 ${d.total.toLocaleString('ko-KR')}건</p>`);}
-    catch(err){out.insertAdjacentHTML('beforeend',`<p class="msg err">${label}: ${esc(err.message)}</p>`);}}
+$('#check-btn').addEventListener('click',async()=>{const out=$('#check');out.innerHTML='<p class="msg">확인 중…</p>';
+  try{const d=await food({rows:1});out.innerHTML=`<p class="msg"><span class="ok">연결됨</span> · 식품영양성분 DB · 전체 ${d.total.toLocaleString('ko-KR')}건</p>`;}
+  catch(err){out.innerHTML=`<p class="msg err">${esc(err.message)}</p>`;}
 });
 
 /* ================= 탭 ================= */
 document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('nav button').forEach(x=>x.setAttribute('aria-selected',x===b));
-  ['search','custom','stats','check'].forEach(t=>$('#tab-'+t).hidden=t!==b.dataset.tab);
+  ['search','custom','check'].forEach(t=>$('#tab-'+t).hidden=t!==b.dataset.tab);
 }));
 </script>
 </body>
