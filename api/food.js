@@ -1,10 +1,7 @@
-// 식품안전나라 API를 대신 호출해 주는 서버 함수예요.
+// 공공데이터포털 '식품의약품안전처_식품영양성분DB정보'를 대신 호출해 주는 서버 함수예요.
 // 인증키는 Vercel 환경변수(FOODSAFETY_KEY)에만 있고, 브라우저로는 절대 보내지 않아요.
 
-const ALLOWED = {
-  C002: ["PRDLST_NM", "PRDLST_DCNM", "BSSH_NM", "PRDLST_REPORT_NO"], // 품목제조보고 원재료
-  I2790: ["DESC_KOR"],                                                // 식품영양성분 DB
-};
+const ENDPOINT = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo03/getFoodNtrCpntDbInq03";
 
 module.exports = async (req, res) => {
   const key = process.env.FOODSAFETY_KEY;
@@ -12,53 +9,44 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: "서버에 인증키가 설정되지 않았어요. Vercel의 Environment Variables에 FOODSAFETY_KEY를 넣고 다시 배포해 주세요." });
   }
 
-  const { svc } = req.query;
-  if (!ALLOWED[svc]) return res.status(400).json({ error: "지원하지 않는 서비스예요." });
+  const name = String(req.query.name || "").trim().slice(0, 100);
+  const page = Math.max(1, parseInt(req.query.page || "1", 10) || 1);
+  const rows = Math.min(100, Math.max(1, parseInt(req.query.rows || "50", 10) || 50));
 
-  const start = Math.max(1, parseInt(req.query.start || "1", 10) || 1);
-  const end = Math.min(start + 999, Math.max(start, parseInt(req.query.end || "50", 10) || 50));
-  const cond = ALLOWED[svc]
-    .filter((f) => req.query[f])
-    .map((f) => `${f}=${encodeURIComponent(String(req.query[f]).slice(0, 100))}`)
-    .join("&");
+  const params = new URLSearchParams({ serviceKey: key, type: "json", pageNo: String(page), numOfRows: String(rows) });
+  if (name) params.set("FOOD_NM_KR", name);
 
-  const path = `/api/${key}/${svc}/json/${start}/${end}` + (cond ? `/${cond}` : "");
   const hide = (t) => String(t).split(key).join("<인증키>");
-
-  let text = "", status = 0, lastErr = "";
-  for (const base of ["http://openapi.foodsafetykorea.go.kr", "https://openapi.foodsafetykorea.go.kr"]) {
-    try {
-      const r = await fetch(base + path, { signal: AbortSignal.timeout(25000) });
-      status = r.status;
-      text = await r.text();
-      break;
-    } catch (e) {
-      lastErr = e && e.name ? e.name : "연결 실패";
-    }
-  }
-  if (!text) {
-    return res.status(502).json({ error: `식품안전나라 서버에 연결하지 못했어요. (${lastErr})` });
-  }
-
+  let text = "", status = 0;
   try {
-    let data;
-    try { data = JSON.parse(text); }
-    catch {
-      return res.status(502).json({
-        error: `식품안전나라가 JSON이 아닌 응답을 보냈어요 (상태 ${status}). 인증키가 식품안전나라용인지, 이 서비스(${svc}) 이용 신청이 되어 있는지 확인해 주세요.`,
-        preview: hide(text.replace(/\s+/g, " ").slice(0, 300)),
-      });
-    }
-
-    const body = data[svc] || data;
-    const code = body?.RESULT?.CODE || "";
-    const msg = body?.RESULT?.MSG || "";
-    if (code === "INFO-200") return res.status(200).json({ total: 0, rows: [] });
-    if (code && code !== "INFO-000") return res.status(502).json({ error: `${msg} (코드 ${code})` });
-
-    res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=3600");
-    return res.status(200).json({ total: parseInt(body.total_count || "0", 10), rows: body.row || [] });
+    const r = await fetch(`${ENDPOINT}?${params}`, { signal: AbortSignal.timeout(25000) });
+    status = r.status;
+    text = await r.text();
   } catch (e) {
-    return res.status(502).json({ error: "식품안전나라 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요." });
+    return res.status(502).json({ error: `공공데이터포털 서버에 연결하지 못했어요. (${e && e.name ? e.name : "연결 실패"})` });
   }
+
+  let data;
+  try { data = JSON.parse(text); }
+  catch {
+    // 인증키 오류 등은 XML이나 일반 글자로 올 때가 많아요.
+    return res.status(502).json({
+      error: `공공데이터포털이 JSON이 아닌 응답을 보냈어요 (상태 ${status}). 인증키가 이 API(식품영양성분DB정보)용인지, 활용신청이 승인됐는지 확인해 주세요.`,
+      preview: hide(text.replace(/\s+/g, " ").slice(0, 300)),
+    });
+  }
+
+  const header = data?.header || data?.response?.header || {};
+  const body = data?.body || data?.response?.body || {};
+  if (header.resultCode === "03") return res.status(200).json({ total: 0, rows: [] }); // 검색 결과 없음
+  if (header.resultCode && header.resultCode !== "00") {
+    return res.status(502).json({ error: `${header.resultMsg || "요청 오류"} (코드 ${header.resultCode})` });
+  }
+
+  let items = body.items;
+  if (items && !Array.isArray(items)) items = items.item;
+  if (items && !Array.isArray(items)) items = [items];
+
+  res.setHeader("Cache-Control", "s-maxage=86400, stale-while-revalidate=3600");
+  return res.status(200).json({ total: parseInt(body.totalCount || "0", 10), rows: items || [] });
 };
