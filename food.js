@@ -22,14 +22,33 @@ module.exports = async (req, res) => {
     .map((f) => `${f}=${encodeURIComponent(String(req.query[f]).slice(0, 100))}`)
     .join("&");
 
-  const url = `http://openapi.foodsafetykorea.go.kr/api/${key}/${svc}/json/${start}/${end}` + (cond ? `/${cond}` : "");
+  const path = `/api/${key}/${svc}/json/${start}/${end}` + (cond ? `/${cond}` : "");
+  const hide = (t) => String(t).split(key).join("<인증키>");
+
+  let text = "", status = 0, lastErr = "";
+  for (const base of ["http://openapi.foodsafetykorea.go.kr", "https://openapi.foodsafetykorea.go.kr"]) {
+    try {
+      const r = await fetch(base + path, { signal: AbortSignal.timeout(25000) });
+      status = r.status;
+      text = await r.text();
+      break;
+    } catch (e) {
+      lastErr = e && e.name ? e.name : "연결 실패";
+    }
+  }
+  if (!text) {
+    return res.status(502).json({ error: `식품안전나라 서버에 연결하지 못했어요. (${lastErr})` });
+  }
 
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
-    const text = await r.text();
     let data;
     try { data = JSON.parse(text); }
-    catch { return res.status(502).json({ error: "식품안전나라 응답을 읽지 못했어요. 인증키가 이 서비스용인지 확인해 주세요." }); }
+    catch {
+      return res.status(502).json({
+        error: `식품안전나라가 JSON이 아닌 응답을 보냈어요 (상태 ${status}). 인증키가 식품안전나라용인지, 이 서비스(${svc}) 이용 신청이 되어 있는지 확인해 주세요.`,
+        preview: hide(text.replace(/\s+/g, " ").slice(0, 300)),
+      });
+    }
 
     const body = data[svc] || data;
     const code = body?.RESULT?.CODE || "";

@@ -38,7 +38,7 @@ textarea{width:100%;min-height:120px;resize:vertical}
 .btn:disabled{opacity:.5;cursor:wait}
 .btn.ghost{background:none;color:var(--accent);border:1px solid var(--accent);padding:6px 12px;font-size:13px}
 .msg{font-size:14px;padding:12px 14px;border-radius:8px;background:var(--card);border:1px dashed var(--rule);color:var(--muted)}
-.msg.err{border:1px solid var(--g4);color:var(--g4)}
+.msg.err{border:1px solid var(--g4);color:var(--g4);white-space:pre-wrap;overflow-wrap:anywhere}
 .search-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;margin-top:18px;align-items:start}
 @media (max-width:860px){.search-layout{grid-template-columns:1fr}}
 .results{display:flex;flex-direction:column;gap:2px;max-height:70vh;overflow:auto}
@@ -212,8 +212,9 @@ function analyze(raw){
 async function food(params){
   const qs=new URLSearchParams(params).toString();
   const r=await fetch('/api/food?'+qs);
-  let d;try{d=await r.json();}catch{throw new Error('서버 응답을 읽지 못했어요.');}
-  if(!r.ok) throw new Error(d.error||'요청에 실패했어요.');
+  const text=await r.text();let d;
+  try{d=JSON.parse(text);}catch{throw new Error(`우리 사이트의 서버 함수(/api/food)가 응답하지 않아요 (상태 ${r.status}). api 폴더가 저장소 맨 위에 있는지 확인해 주세요.`);}
+  if(!r.ok) throw new Error((d.error||'요청에 실패했어요.')+(d.preview?`\n\n[식품안전나라 응답 앞부분] ${d.preview}`:''));
   return d;
 }
 

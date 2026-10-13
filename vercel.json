@@ -1,3 +1,6 @@
 {
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "functions": {
+    "api/food.js": { "maxDuration": 60 }
+  }
 }
