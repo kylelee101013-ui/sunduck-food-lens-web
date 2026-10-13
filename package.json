@@ -1,0 +1,5 @@
+{
+  "name": "sunduck-food-lens",
+  "private": true,
+  "engines": { "node": ">=18" }
+}
